@@ -1,0 +1,76 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int     @id @default(autoincrement())
+  employeeId String  @unique
+  firstName  String
+  lastName   String
+  email      String  @unique
+  password   String
+  role       String  @default("employee")
+  department String?
+  securityQuestions String? @db.Text
+
+  attendances Attendance[]
+
+  createdAt DateTime @default(now())
+}
+
+model Attendance {
+  id Int @id @default(autoincrement())
+
+  employeeId Int
+  employee   User @relation(fields: [employeeId], references: [id])
+
+  date DateTime @default(now())
+
+  clockIn  DateTime?
+  clockOut DateTime?
+
+  latitude  Float?
+  longitude Float?
+
+  totalHours    Float?
+  overtimeHours Float?
+
+  status String @default("Present")
+}
+
+model Leave {
+  id Int @id @default(autoincrement())
+
+  employeeId Int
+
+  leaveType String
+
+  startDate DateTime
+
+  endDate DateTime
+
+  reason String
+
+  status String @default("Pending")
+
+  createdAt DateTime @default(now())
+}
+
+model Office {
+  id Int @id @default(autoincrement())
+
+  name String
+
+  latitude Float
+
+  longitude Float
+
+  radius Int @default(100)
+
+  createdAt DateTime @default(now())
+}
