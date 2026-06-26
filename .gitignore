@@ -7,10 +7,23 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
+
+# Build output
 dist
 dist-ssr
+
+# Local config
 *.local
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Database dumps
+*.sql
 
 # Editor directories and files
 .vscode/*
@@ -22,6 +35,3 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-
-# Database dumps
-*.sql
