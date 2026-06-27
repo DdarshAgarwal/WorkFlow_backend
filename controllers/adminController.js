@@ -385,16 +385,17 @@ exports.updateOffice = async (req, res) => {
 
   } catch (error) {
 
-    console.error(error);
+ console.error("========== OFFICE UPDATE ERROR ==========");
+console.error(error);
+console.error(error.stack);
 
-    return res.status(500).json({
+return res.status(500).json({
+  success: false,
+  message: error.message,
+  prismaError: error,
+});
 
-      success: false,
-
-      message:
-        error.message || "Failed to update office settings.",
-
-    });
+    
 
   }
 
