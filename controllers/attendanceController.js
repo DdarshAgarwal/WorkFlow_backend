@@ -357,7 +357,7 @@ exports.getLateHistory = async (req, res) => {
             )
           );
 
-        return {
+         return {
 
           ...late,
 
