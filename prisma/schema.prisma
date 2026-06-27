@@ -8,17 +8,23 @@ datasource db {
 }
 
 model User {
-  id         Int     @id @default(autoincrement())
-  employeeId String  @unique
-  firstName  String
-  lastName   String
-  email      String  @unique
-  password   String
+  id         Int    @id @default(autoincrement())
+  employeeId String @unique
+
+  firstName String
+  lastName  String
+
+  email    String @unique
+  password String
+
   role       String  @default("employee")
   department String?
+
   securityQuestions String? @db.Text
 
   attendances Attendance[]
+  leaves      Leave[]
+  lateHistory LateAttendance[]
 
   createdAt DateTime @default(now())
 }
@@ -41,12 +47,30 @@ model Attendance {
   overtimeHours Float?
 
   status String @default("Present")
+
+  lateAttendance LateAttendance?
+}
+
+model LateAttendance {
+  id Int @id @default(autoincrement())
+
+  employeeId Int
+  employee   User @relation(fields: [employeeId], references: [id])
+
+  attendanceId Int?        @unique
+  attendance   Attendance? @relation(fields: [attendanceId], references: [id])
+
+  lateDate DateTime
+  clockIn  DateTime
+
+  createdAt DateTime @default(now())
 }
 
 model Leave {
   id Int @id @default(autoincrement())
 
   employeeId Int
+  employee   User @relation(fields: [employeeId], references: [id])
 
   leaveType String
 
@@ -71,6 +95,20 @@ model Office {
   longitude Float
 
   radius Int @default(100)
+
+  officeStartTime String @default("10:00")
+
+  officeEndTime String @default("19:00")
+
+  graceMinutes Int @default(15)
+
+  fullDayHours Float @default(8)
+
+  halfDayHours Float @default(4)
+
+  workingDays String @default("Monday,Tuesday,Wednesday,Thursday,Friday")
+
+  timezone String @default("Asia/Kolkata")
 
   createdAt DateTime @default(now())
 }

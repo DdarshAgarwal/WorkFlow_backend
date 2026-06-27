@@ -204,18 +204,51 @@ exports.addEmployee = async (
 
 };
 exports.getOffice = async (req, res) => {
-
   try {
 
-    const office =
-      await prisma.office.findFirst();
+    let office = await prisma.office.findFirst();
 
-    res.json(office);
+    // Create default office if it doesn't exist
+    if (!office) {
+
+      office = await prisma.office.create({
+        data: {
+          name: "My Office",
+          latitude: 0,
+          longitude: 0,
+          radius: 100,
+
+          officeStartTime: "10:00",
+          officeEndTime: "19:00",
+
+          graceMinutes: 15,
+
+          fullDayHours: 8,
+
+          halfDayHours: 4,
+
+          workingDays:
+            "Monday,Tuesday,Wednesday,Thursday,Friday",
+
+          timezone:
+            "Asia/Kolkata",
+        },
+      });
+
+    }
+
+    return res.json({
+      success: true,
+      office,
+    });
 
   } catch (error) {
 
-    res.status(500).json({
-      message: error.message
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch office settings.",
     });
 
   }
@@ -227,42 +260,137 @@ exports.updateOffice = async (req, res) => {
   try {
 
     const {
+
       name,
+
       latitude,
+
       longitude,
-      radius
+
+      radius,
+
+      officeStartTime,
+
+      officeEndTime,
+
+      graceMinutes,
+
+      fullDayHours,
+
+      halfDayHours,
+
+      workingDays,
+
+      timezone,
+
     } = req.body;
 
-    const office =
+    let office =
       await prisma.office.findFirst();
 
     if (!office) {
 
-      return res.status(404).json({
-        message: "Office not found"
+      office =
+        await prisma.office.create({
+          data: {
+
+            name,
+
+            latitude: Number(latitude),
+
+            longitude: Number(longitude),
+
+            radius: Number(radius),
+
+            officeStartTime,
+
+            officeEndTime,
+
+            graceMinutes: Number(graceMinutes),
+
+            fullDayHours:
+              Number(fullDayHours),
+
+            halfDayHours:
+              Number(halfDayHours),
+
+            workingDays,
+
+            timezone,
+
+          },
+        });
+
+      return res.json({
+        success: true,
+        office,
       });
 
     }
 
     const updated =
       await prisma.office.update({
+
         where: {
-          id: office.id
+          id: office.id,
         },
+
         data: {
+
           name,
-          latitude: Number(latitude),
-          longitude: Number(longitude),
-          radius: Number(radius)
-        }
+
+          latitude:
+            Number(latitude),
+
+          longitude:
+            Number(longitude),
+
+          radius:
+            Number(radius),
+
+          officeStartTime,
+
+          officeEndTime,
+
+          graceMinutes:
+            Number(graceMinutes),
+
+          fullDayHours:
+            Number(fullDayHours),
+
+          halfDayHours:
+            Number(halfDayHours),
+
+          workingDays,
+
+          timezone,
+
+        },
+
       });
 
-    res.json(updated);
+    return res.json({
+
+      success: true,
+
+      office: updated,
+
+      message:
+        "Office settings updated successfully.",
+
+    });
 
   } catch (error) {
 
-    res.status(500).json({
-      message: error.message
+    console.error(error);
+
+    return res.status(500).json({
+
+      success: false,
+
+      message:
+        "Failed to update office settings.",
+
     });
 
   }
