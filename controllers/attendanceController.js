@@ -313,7 +313,7 @@ exports.getLateHistory = async (req, res) => {
       lateHistory.map((late) => {
 
         const [hour, minute] =
-          office.officeStartTime
+          (office?.officeStartTime || "10:00")
             .split(":")
             .map(Number);
 
@@ -357,6 +357,15 @@ exports.getLateHistory = async (req, res) => {
   } catch (error) {
 
     console.error(error);
+
+    if (error.code === "P2021" || error.code === "P2022") {
+      return res.json({
+        success: true,
+        lateHistory: [],
+        message:
+          "Late history is not available until the latest database migration is applied.",
+      });
+    }
 
     return res.status(500).json({
 

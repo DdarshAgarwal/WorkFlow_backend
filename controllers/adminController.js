@@ -12,6 +12,55 @@ const sanitizeUser = (user) => {
   return safeUser;
 };
 
+const toOfficeTime = (value, fallback) => {
+  if (!value) return fallback;
+
+  const normalized =
+    String(value)
+      .trim()
+      .replace(/\s+/g, "")
+      .toUpperCase();
+
+  const meridiemMatch =
+    normalized.match(/^(\d{1,2}):(\d{2})(AM|PM)$/);
+
+  if (meridiemMatch) {
+    let hours = Number(meridiemMatch[1]);
+    const minutes = meridiemMatch[2];
+    const meridiem = meridiemMatch[3];
+
+    if (meridiem === "PM" && hours < 12) hours += 12;
+    if (meridiem === "AM" && hours === 12) hours = 0;
+
+    return `${String(hours).padStart(2, "0")}:${minutes}`;
+  }
+
+  const timeMatch =
+    normalized.match(/^(\d{1,2}):(\d{2})$/);
+
+  if (!timeMatch) return fallback;
+
+  return `${String(Number(timeMatch[1])).padStart(2, "0")}:${timeMatch[2]}`;
+};
+
+const normalizeOfficeData = (body) => ({
+  name: String(body.name || "").trim(),
+  latitude: Number(body.latitude),
+  longitude: Number(body.longitude),
+  radius: Number(body.radius),
+  officeStartTime: toOfficeTime(body.officeStartTime, "10:00"),
+  officeEndTime: toOfficeTime(body.officeEndTime, "19:00"),
+  graceMinutes: Number(body.graceMinutes ?? 15),
+  fullDayHours: Number(body.fullDayHours ?? 8),
+  halfDayHours: Number(body.halfDayHours ?? 4),
+  workingDays:
+    String(body.workingDays || "Monday,Tuesday,Wednesday,Thursday,Friday")
+      .trim(),
+  timezone:
+    String(body.timezone || "Asia/Kolkata")
+      .trim(),
+});
+
 exports.dashboard =
 async (req, res) => {
 
@@ -269,31 +318,31 @@ exports.updateOffice = async (req, res) => {
 
   try {
 
-    const {
+    const officeData = normalizeOfficeData(req.body);
 
-      name,
+    if (!officeData.name) {
+      return res.status(400).json({
+        success: false,
+        message: "Office name is required.",
+      });
+    }
 
-      latitude,
+    if (
+      !Number.isFinite(officeData.latitude) ||
+      !Number.isFinite(officeData.longitude)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid latitude and longitude are required.",
+      });
+    }
 
-      longitude,
-
-      radius,
-
-      officeStartTime,
-
-      officeEndTime,
-
-      graceMinutes,
-
-      fullDayHours,
-
-      halfDayHours,
-
-      workingDays,
-
-      timezone,
-
-    } = req.body;
+    if (!Number.isFinite(officeData.radius) || officeData.radius <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Valid geofence radius is required.",
+      });
+    }
 
     let office =
       await prisma.office.findFirst();
@@ -302,33 +351,7 @@ exports.updateOffice = async (req, res) => {
 
       office =
         await prisma.office.create({
-          data: {
-
-            name,
-
-            latitude: Number(latitude),
-
-            longitude: Number(longitude),
-
-            radius: Number(radius),
-
-            officeStartTime,
-
-            officeEndTime,
-
-            graceMinutes: Number(graceMinutes),
-
-            fullDayHours:
-              Number(fullDayHours),
-
-            halfDayHours:
-              Number(halfDayHours),
-
-            workingDays,
-
-            timezone,
-
-          },
+          data: officeData,
         });
 
       return res.json({
@@ -345,37 +368,7 @@ exports.updateOffice = async (req, res) => {
           id: office.id,
         },
 
-        data: {
-
-          name,
-
-          latitude:
-            Number(latitude),
-
-          longitude:
-            Number(longitude),
-
-          radius:
-            Number(radius),
-
-          officeStartTime,
-
-          officeEndTime,
-
-          graceMinutes:
-            Number(graceMinutes),
-
-          fullDayHours:
-            Number(fullDayHours),
-
-          halfDayHours:
-            Number(halfDayHours),
-
-          workingDays,
-
-          timezone,
-
-        },
+        data: officeData,
 
       });
 
@@ -399,7 +392,7 @@ exports.updateOffice = async (req, res) => {
       success: false,
 
       message:
-        "Failed to update office settings.",
+        error.message || "Failed to update office settings.",
 
     });
 
