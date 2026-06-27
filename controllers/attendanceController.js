@@ -11,7 +11,7 @@ exports.clockIn = async (req, res) => {
 
     const { latitude, longitude } = req.body;
 
-    if (!latitude || !longitude) {
+    if (latitude == null || longitude == null) {
       return res.status(400).json({
         success: false,
         message: "Location is required.",
@@ -74,86 +74,63 @@ exports.clockIn = async (req, res) => {
       });
     }
 
-    // ==============================
-    // Create Attendance
-    // ==============================
+    const now = new Date();
 
-    // ==============================
-// Create Attendance
-// ==============================
+    const attendance = await prisma.attendance.create({
+      data: {
+        employeeId: userId,
+        clockIn: now,
+        latitude,
+        longitude,
+        status: "Present",
+      },
+    });
 
-const now = new Date();
+    const [startHour, startMinute] =
+      office.officeStartTime
+        .split(":")
+        .map(Number);
 
-const attendance = await prisma.attendance.create({
-  data: {
-    employeeId: userId,
-    clockIn: now,
-    latitude,
-    longitude,
-    status: "Present",
-  },
-});
+    const allowedTime = new Date(now);
 
-// ======================================
-// Late Detection using Office Settings
-// ======================================
+    allowedTime.setHours(
+      startHour,
+      startMinute + office.graceMinutes,
+      0,
+      0
+    );
 
-const [startHour, startMinute] =
-  office.officeStartTime
-    .split(":")
-    .map(Number);
+    const isLate = now > allowedTime;
 
-const allowedTime = new Date(now);
+    if (isLate) {
+      await prisma.lateAttendance.create({
+        data: {
+          employeeId: userId,
+          attendanceId: attendance.id,
+          lateDate: now,
+          clockIn: now,
+        },
+      });
+    }
 
-allowedTime.setHours(
-  startHour,
-  startMinute + office.graceMinutes,
-  0,
-  0
-);
+    const totalLateDays = await prisma.lateAttendance.count({
+      where: {
+        employeeId: userId,
+      },
+    });
 
-let isLate = false;
-
-if (now > allowedTime) {
-
-  isLate = true;
-
-  await prisma.lateAttendance.create({
-
-    data: {
-
-      employeeId: userId,
-
-      attendanceId: attendance.id,
-
-      lateDate: now,
-
-      clockIn: now,
-
-    },
-
-  });
-
-}
-
-return res.status(201).json({
-
-  success: true,
-
-  attendance,
-
-  isLate,
-
-  message: isLate
-    ? "Clocked in successfully. You have been marked late."
-    : "Clocked in successfully.",
-
-});
+    const lateLeaveDeductions =
+      Math.floor(totalLateDays / 3);
 
     return res.status(201).json({
       success: true,
-      message: "Clocked in successfully.",
       attendance,
+      clockedIn: true,
+      isLate,
+      lateLeaveDeductions,
+      message: isLate
+        ? "Clocked in successfully. You have been marked late."
+        : "Clocked in successfully.",
     });
 
   } catch (error) {
@@ -218,6 +195,7 @@ exports.clockOut = async (req, res) => {
     return res.json({
       success: true,
       message: "Clocked out successfully.",
+      clockedIn: false,
       attendance: updatedAttendance,
     });
 
@@ -277,7 +255,8 @@ exports.getAttendanceStatus = async (req, res) => {
 
     const userId = req.user.userId;
 
-    const activeAttendance =       await prisma.attendance.findFirst({
+    const activeAttendance =
+      await prisma.attendance.findFirst({
         where: {
           employeeId: userId,
           clockOut: null,
@@ -357,7 +336,7 @@ exports.getLateHistory = async (req, res) => {
             )
           );
 
-         return {
+        return {
 
           ...late,
 

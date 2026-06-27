@@ -1,5 +1,26 @@
 const prisma = require("../lib/prisma");
 const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
+const sanitizeUser = (user) => {
+  const {
+    password,
+    securityQuestions,
+    ...safeUser
+  } = user;
+
+  return safeUser;
+};
+
+const answersMatch = (storedQuestions, answers) =>
+  storedQuestions.every((q, index) => {
+    if (!answers[index]) return false;
+
+    return (
+      q.answer.toLowerCase().trim() ===
+      answers[index].toLowerCase().trim()
+    );
+  });
 
 exports.register = async (req, res) => {
   try {
@@ -70,8 +91,6 @@ exports.register = async (req, res) => {
         }
       });
 
-   const { password: _, ...safeUser } = user;
-
   // create JWT token for the newly registered user
   const token = jwt.sign(
     {
@@ -85,7 +104,7 @@ exports.register = async (req, res) => {
   res.status(201).json({
     success: true,
     token,
-    user: safeUser
+    user: sanitizeUser(user)
   });
 
   } catch (error) {
@@ -96,8 +115,6 @@ exports.register = async (req, res) => {
     });
   }
 };
-
-const jwt = require("jsonwebtoken");
 
 exports.login = async (req, res) => {
    try {
@@ -138,12 +155,10 @@ exports.login = async (req, res) => {
       }
     );
 
-    const { password: _, ...safeUser } = user;
-
     res.json({
       success: true,
       token,
-      user: safeUser
+      user: sanitizeUser(user)
     });
 
   } catch (error) {
@@ -186,15 +201,10 @@ exports.updateProfile =
 
       });
 
-    const {
-      password,
-      ...safeUser
-    } = updatedUser;
-
     res.json({
 
       success: true,
-      user: safeUser
+      user: sanitizeUser(updatedUser)
 
     });
 
@@ -242,9 +252,7 @@ exports.changePassword = async (req, res) => {
       data: { password: hashedPassword }
     });
 
-    const { password: _, ...safeUser } = updatedUser;
-
-    res.json({ success: true, user: safeUser });
+    res.json({ success: true, user: sanitizeUser(updatedUser) });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: error.message });
@@ -253,10 +261,12 @@ exports.changePassword = async (req, res) => {
 
 exports.forgotPassword = async (req, res) => {
   try {
-    const { email, newPassword } = req.body;
+    const { email, newPassword, answers } = req.body;
 
-    if (!email || !newPassword) {
-      return res.status(400).json({ message: "Email and new password are required" });
+    if (!email || !newPassword || !answers || !Array.isArray(answers)) {
+      return res.status(400).json({
+        message: "Email, new password, and security answers are required"
+      });
     }
 
     const user = await prisma.user.findUnique({
@@ -267,6 +277,16 @@ exports.forgotPassword = async (req, res) => {
       return res.status(404).json({ message: "User not found" });
     }
 
+    if (!user.securityQuestions) {
+      return res.status(400).json({ message: "User has not set security questions" });
+    }
+
+    const storedQuestions = JSON.parse(user.securityQuestions);
+
+    if (!answersMatch(storedQuestions, answers)) {
+      return res.status(400).json({ message: "Incorrect security question answers" });
+    }
+
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     const updatedUser = await prisma.user.update({
@@ -274,9 +294,11 @@ exports.forgotPassword = async (req, res) => {
       data: { password: hashedPassword }
     });
 
-    const { password: _, ...safeUser } = updatedUser;
-
-    res.json({ success: true, user: safeUser, message: "Password changed successfully" });
+    res.json({
+      success: true,
+      user: sanitizeUser(updatedUser),
+      message: "Password changed successfully"
+    });
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: error.message });
@@ -304,7 +326,10 @@ exports.getSecurityQuestions = async (req, res) => {
       return res.status(400).json({ message: "User has not set security questions" });
     }
 
-    const questions = JSON.parse(user.securityQuestions);
+    const questions = JSON.parse(user.securityQuestions).map(({ question }) => ({
+      question
+    }));
+
     res.json({ questions });
   } catch (error) {
     console.log(error);
@@ -335,11 +360,7 @@ exports.verifySecurityQuestions = async (req, res) => {
 
     const storedQuestions = JSON.parse(user.securityQuestions);
     
-    // Case-insensitive and trimmed comparison
-    const allCorrect = storedQuestions.every((q, index) => {
-      if (!answers[index]) return false;
-      return q.answer.toLowerCase().trim() === answers[index].toLowerCase().trim();
-    });
+    const allCorrect = answersMatch(storedQuestions, answers);
 
     if (!allCorrect) {
       return res.status(400).json({ message: "Incorrect security question answers" });

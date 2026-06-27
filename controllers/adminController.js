@@ -2,6 +2,16 @@ const prisma =
 require("../lib/prisma");
 const bcrypt = require("bcryptjs");
 
+const sanitizeUser = (user) => {
+  const {
+    password,
+    securityQuestions,
+    ...safeUser
+  } = user;
+
+  return safeUser;
+};
+
 exports.dashboard =
 async (req, res) => {
 
@@ -190,7 +200,7 @@ exports.addEmployee = async (
 
     res.status(201).json({
       success: true,
-      user,
+      user: sanitizeUser(user),
     });
 
   } catch (error) {
@@ -432,7 +442,7 @@ exports.updateEmployee = async (
 
     res.json({
       success: true,
-      employee,
+      employee: sanitizeUser(employee),
     });
 
   } catch (error) {
@@ -456,12 +466,13 @@ exports.deleteEmployee = async (req, res) => {
     }
 
     // remove related attendance and leave records first
+    await prisma.lateAttendance.deleteMany({ where: { employeeId: userId } });
     await prisma.attendance.deleteMany({ where: { employeeId: userId } });
     await prisma.leave.deleteMany({ where: { employeeId: userId } });
 
     const deleted = await prisma.user.delete({ where: { id: userId } });
 
-    res.json({ success: true, user: deleted });
+    res.json({ success: true, user: sanitizeUser(deleted) });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
